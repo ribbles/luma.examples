@@ -58,28 +58,19 @@ def bytes2human(n):
 
 def ip_addr():
     addrs = psutil.net_if_addrs()
-    output = ''
     for name, data in addrs.items():
         if name == 'lo':
             continue
         for e in data:
             if e.family == AddressFamily.AF_INET:
-                output += e.address + ' '
-    return output or 'No IP assigned'
+                return 'IP: ' + e.address
+    return 'IP: not found'
 
 
 def cpu_percent():
     cpu = psutil.cpu_percent()
     temp = next(iter(psutil.sensors_temperatures().values()))[0].current
     return "CPU: %.0f%%  %.0f°C" % (cpu, temp)
-
-
-def cpu_usage():
-    # load average, uptime
-    uptime = datetime.now() - datetime.fromtimestamp(psutil.boot_time())
-    av1, av2, av3 = os.getloadavg()
-    return "Ld:%.1f %.1f %.1f Up: %s" \
-        % (av1, av2, av3, str(uptime).split('.')[0])
 
 
 def mem_usage():
@@ -96,34 +87,44 @@ def disk_usage(dir):
 
 def network(iface):
     stat = psutil.net_io_counters(pernic=True)[iface]
-    return "%s: Tx%s, Rx%s" % \
+    return "%s: Tx %s Rx %s" % \
            (iface, bytes2human(stat.bytes_sent), bytes2human(stat.bytes_recv))
 
 
+
 def stats(device):
+    global row
     # use custom font
-    font_path = str(Path(__file__).resolve().parent.joinpath('fonts', 'C&C Red Alert [INET].ttf'))
-    font2 = ImageFont.truetype(font_path, 16)
-
+#     font_path = str(Path(__file__).resolve().parent.joinpath('fonts', 'C&C Red Alert [INET].ttf'))
+#     font_path = str(Path(__file__).resolve().parent.joinpath('fonts', 'code2000.ttf'))
+    font_path = str(Path(__file__).resolve().parent.joinpath('fonts', 'FreePixel.ttf'))
+    font2 = ImageFont.truetype(font_path, 12)
+    row = 0
+    
+    def draw_text(text):
+        global row
+        draw.text((0, row), text, font=font2, fill="white")
+        row += (font2.size - 2)
+    
     with canvas(device) as draw:
-        draw.text((0, 0), ip_addr(), font=font2, fill="white")
-#        draw.text((0, 10), cpu_usage(), font=font2, fill="white")
-        draw.text((0, 10), cpu_percent(), font=font2, fill="white")
+        draw_text(datetime.now().strftime("%b %d %H:%M:%S"))
+        draw_text(ip_addr())
+        draw_text(cpu_percent())
         if device.height >= 32:
-            draw.text((0, 20), mem_usage(), font=font2, fill="white")
-
+            draw_text(mem_usage())
         if device.height >= 64:
-            draw.text((0, 30), disk_usage('/'), font=font2, fill="white")
+            draw_text(disk_usage('/'))
             try:
-                draw.text((0, 40), network('wlan0'), font=font2, fill="white")
+                draw_text(network('wlan0'))
             except KeyError:
                 #print("no wifi enabled/available")
                 pass
             try:
-                draw.text((0, 50), network('eth0'), font=font2, fill="white")
+                draw_text(network('eth0'))
             except KeyError:
                 #print("no lan enabled/available")
                 pass
+        draw.text((0, row), str(row))
 
 def main():
     while True:
